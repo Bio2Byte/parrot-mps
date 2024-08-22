@@ -8,20 +8,30 @@ idptools-parrot was developed by the Holehouse lab
 Question/comments/concerns? Raise an issue on github:
 https://github.com/idptools/parrot
 
-Licensed under the MIT license. 
+Licensed under the MIT license.
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
 
-from parrot import brnn_plot
-from parrot import encode_sequence
+from parrot import brnn_plot, encode_sequence
 
 
-def train(network, train_loader, val_loader, datatype, problem_type, weights_file,
-          stop_condition, device, learn_rate, n_epochs, verbose=False, silent=False):
+def train(
+    network,
+    train_loader,
+    val_loader,
+    datatype,
+    problem_type,
+    weights_file,
+    stop_condition,
+    device,
+    learn_rate,
+    n_epochs,
+    verbose=False,
+    silent=False,
+):
     """Train a BRNN and save the best performing network weights
 
     Train the network on a training set, and every epoch evaluate its performance on
@@ -30,8 +40,8 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
 
     User must specify the machine learning tast (`problem_type`) and the format of
     the data (`datatype`). Additionally, this function requires the learning rate
-    hyperparameter and the number of epochs of training. The other hyperparameters, 
-    number of hidden layers and hidden vector size, are implictly included on the 
+    hyperparameter and the number of epochs of training. The other hyperparameters,
+    number of hidden layers and hidden vector size, are implictly included on the
     the provided network.
 
     The user may specify if they want to train the network for a set number of
@@ -64,8 +74,9 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
             performance has sufficiently stagnated. If the performance plateaus for
             `n_epochs` consecutive epochs, then training will stop.
     device : str
-            Location of where training will take place--should be either 'cpu' or
-            'cuda' (GPU). If available, training on GPU is typically much faster.
+            Location of where training will take place--should be 'cpu', 'mps' (Apple
+            GPU) or 'cuda' (GPU). If available, training on GPU is typically
+            much faster.
     learn_rate : float
             Initial learning rate of network training. The training process is
             controlled by the Adam optimization algorithm, so this learning rate
@@ -91,13 +102,13 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
     optimizer = torch.optim.Adam(network.parameters(), lr=learn_rate)
 
     # Set loss criteria
-    if problem_type == 'regression':
-        if datatype == 'residues':
-            criterion = nn.MSELoss(reduction='sum')
-        elif datatype == 'sequence':
-            criterion = nn.L1Loss(reduction='sum')
-    elif problem_type == 'classification':
-        criterion = nn.CrossEntropyLoss(reduction='sum')
+    if problem_type == "regression":
+        if datatype == "residues":
+            criterion = nn.MSELoss(reduction="sum")
+        elif datatype == "sequence":
+            criterion = nn.L1Loss(reduction="sum")
+    elif problem_type == "classification":
+        criterion = nn.CrossEntropyLoss(reduction="sum")
 
     network = network.float()
     total_step = len(train_loader)
@@ -105,7 +116,7 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
     avg_train_losses = []
     avg_val_losses = []
 
-    if stop_condition == 'auto':
+    if stop_condition == "auto":
         min_epochs = n_epochs
         # Set to some arbitrarily large number of iterations -- will stop automatically
         n_epochs = 20000000
@@ -127,10 +138,10 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
             # Forward pass
             outputs = network(vectors.float())
 
-            if problem_type == 'regression':
+            if problem_type == "regression":
                 loss = criterion(outputs, targets.float())
             else:
-                if datatype == 'residues':
+                if datatype == "residues":
                     outputs = outputs.permute(0, 2, 1)
                 loss = criterion(outputs, targets.long())
 
@@ -147,10 +158,10 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
 
             # Forward pass
             outputs = network(vectors.float())
-            if problem_type == 'regression':
+            if problem_type == "regression":
                 loss = criterion(outputs, targets.float())
             else:
-                if datatype == 'residues':
+                if datatype == "residues":
                     outputs = outputs.permute(0, 2, 1)
                 loss = criterion(outputs, targets.long())
 
@@ -162,12 +173,12 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
         val_loss /= len(val_loader.dataset)
 
         signif_decrease = True
-        if stop_condition == 'auto' and epoch > min_epochs - 1:
+        if stop_condition == "auto" and epoch > min_epochs - 1:
             # Check to see if loss has stopped decreasing
             last_epochs_loss = avg_val_losses[-min_epochs:]
 
             for loss in last_epochs_loss:
-                if val_loss >= loss*0.995:
+                if val_loss >= loss * 0.995:
                     signif_decrease = False
 
             # If network performance has plateaued over the last range of epochs, end training
@@ -176,7 +187,7 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
 
         # Only save updated weights to memory if they improve val set performance
         if val_loss < min_val_loss:
-            min_val_loss = val_loss 	# Reset min_val_loss
+            min_val_loss = val_loss  # Reset min_val_loss
             last_decrease = epoch
             torch.save(network.state_dict(), weights_file)  # Save model
 
@@ -185,9 +196,9 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
         avg_val_losses.append(val_loss)
 
         if verbose:
-            print('Epoch %d\tLoss %.4f' % (epoch, val_loss))
+            print("Epoch %d\tLoss %.4f" % (epoch, val_loss))
         elif epoch % 5 == 0 and silent is False:
-            print('Epoch %d\tLoss %.4f' % (epoch, val_loss))
+            print("Epoch %d\tLoss %.4f" % (epoch, val_loss))
 
         # This is placed here to ensure that the best network, even if the performance
         # improvement is marginal, is saved.
@@ -198,15 +209,23 @@ def train(network, train_loader, val_loader, datatype, problem_type, weights_fil
     return avg_train_losses, avg_val_losses
 
 
-def test_labeled_data(network, test_loader, datatype,
-                      problem_type, weights_file, num_classes,
-                      probabilistic_classification, include_figs, 
-                      device, output_file_prefix=''):
+def test_labeled_data(
+    network,
+    test_loader,
+    datatype,
+    problem_type,
+    weights_file,
+    num_classes,
+    probabilistic_classification,
+    include_figs,
+    device,
+    output_file_prefix="",
+):
     """Test a trained BRNN on labeled sequences
 
     Using the saved weights of a trained network, run a set of sequences through
     the network and evaluate the performancd. Return the average loss per
-    sequence and plot the results. Testing a network on previously-unseen data 
+    sequence and plot the results. Testing a network on previously-unseen data
     provides a useful estimate of how generalizeable the network's performance is.
 
     Parameters
@@ -232,10 +251,11 @@ def test_labeled_data(network, test_loader, datatype,
     include_figs: bool
             Whether or not matplotlib figures should be generated.
     device : str
-            Location of where testing will take place--should be either 'cpu' or
-            'cuda' (GPU). If available, training on GPU is typically much faster.
+            Location of where training will take place--should be 'cpu', 'mps' (Apple
+            GPU) or 'cuda' (GPU). If available, training on GPU is typically
+            much faster.
     output_file_prefix : str
-            Path and filename prefix to which the test set predictions and plots will be saved. 
+            Path and filename prefix to which the test set predictions and plots will be saved.
 
     Returns
     -------
@@ -251,20 +271,20 @@ def test_labeled_data(network, test_loader, datatype,
     network.load_state_dict(torch.load(weights_file))
 
     # Get output directory for images
-    network_filename = weights_file.split('/')[-1]
-    output_dir = weights_file[:-len(network_filename)]
+    network_filename = weights_file.split("/")[-1]
+    output_dir = weights_file[: -len(network_filename)]
 
     # Set loss criteria
-    if problem_type == 'regression':
+    if problem_type == "regression":
         criterion = nn.MSELoss()
-    elif problem_type == 'classification':
+    elif problem_type == "classification":
         criterion = nn.CrossEntropyLoss()
 
     test_loss = 0
     all_targets = []
     all_outputs = []
     predictions = []
-    for names, vectors, targets in test_loader: 	# batch size of 1
+    for names, vectors, targets in test_loader:  # batch size of 1
         all_targets.append(targets)
 
         vectors = vectors.to(device)
@@ -272,10 +292,10 @@ def test_labeled_data(network, test_loader, datatype,
 
         # Forward pass
         outputs = network(vectors.float())
-        if problem_type == 'regression':
+        if problem_type == "regression":
             loss = criterion(outputs, targets.float())
         else:
-            if datatype == 'residues':
+            if datatype == "residues":
                 outputs = outputs.permute(0, 2, 1)
             loss = criterion(outputs, targets.long())
 
@@ -283,37 +303,49 @@ def test_labeled_data(network, test_loader, datatype,
         all_outputs.append(outputs.detach())
 
         # Add to list as: [seq_vector, true value, predicted value, name]
-        predictions.append([vectors[0].cpu().numpy(), targets.cpu().numpy()
-                           [0], outputs.cpu().detach().numpy(), names[0]])
+        predictions.append(
+            [
+                vectors[0].cpu().numpy(),
+                targets.cpu().numpy()[0],
+                outputs.cpu().detach().numpy(),
+                names[0],
+            ]
+        )
 
     # Plot 'accuracy' depending on the problem type and datatype
-    if problem_type == 'regression':
-        if datatype == 'residues':
+    if problem_type == "regression":
+        if datatype == "residues":
             if include_figs:
-                brnn_plot.residue_regression_scatterplot(all_targets, all_outputs, 
-                                            output_file_prefix=output_file_prefix)
+                brnn_plot.residue_regression_scatterplot(
+                    all_targets, all_outputs, output_file_prefix=output_file_prefix
+                )
 
             # Format predictions
             for i in range(len(predictions)):
                 predictions[i][2] = predictions[i][2].flatten()
                 predictions[i][1] = predictions[i][1].flatten()
 
-        elif datatype == 'sequence':
+        elif datatype == "sequence":
             if include_figs:
-                brnn_plot.sequence_regression_scatterplot(all_targets, all_outputs, 
-                                            output_file_prefix=output_file_prefix)
+                brnn_plot.sequence_regression_scatterplot(
+                    all_targets, all_outputs, output_file_prefix=output_file_prefix
+                )
 
             # Format predictions
             for i in range(len(predictions)):
                 predictions[i][2] = predictions[i][2][0][0]
                 predictions[i][1] = predictions[i][1][0]
 
-    elif problem_type == 'classification':
+    elif problem_type == "classification":
 
-        if datatype == 'residues':
+        if datatype == "residues":
             if include_figs:
-                brnn_plot.res_confusion_matrix(all_targets, all_outputs, num_classes, 
-                                            output_file_prefix=output_file_prefix)
+                brnn_plot.res_confusion_matrix(
+                    all_targets,
+                    all_outputs,
+                    num_classes,
+                    output_file_prefix=output_file_prefix,
+                )
 
             # Format predictions and assign class predictions
             for i in range(len(predictions)):
@@ -322,7 +354,7 @@ def test_labeled_data(network, test_loader, datatype,
                     pred_values = np.argmax(predictions[i][2], axis=1)[0]
                 predictions[i][2] = np.array(pred_values, dtype=np.int)
 
-        elif datatype == 'sequence':
+        elif datatype == "sequence":
             if probabilistic_classification:
                 # Probabilistic assignment of class predictions
                 # Optional implementation for classification tasks
@@ -337,10 +369,18 @@ def test_labeled_data(network, test_loader, datatype,
 
                 # Plot ROC and PR curves
                 if include_figs:
-                    brnn_plot.plot_roc_curve(all_targets, pred_probabilities, num_classes, 
-                                            output_file_prefix=output_file_prefix)
-                    brnn_plot.plot_precision_recall_curve(all_targets, pred_probabilities, 
-                                            num_classes, output_file_prefix=output_file_prefix)
+                    brnn_plot.plot_roc_curve(
+                        all_targets,
+                        pred_probabilities,
+                        num_classes,
+                        output_file_prefix=output_file_prefix,
+                    )
+                    brnn_plot.plot_precision_recall_curve(
+                        all_targets,
+                        pred_probabilities,
+                        num_classes,
+                        output_file_prefix=output_file_prefix,
+                    )
 
             else:
                 # Absolute assignment of class predictions
@@ -351,20 +391,31 @@ def test_labeled_data(network, test_loader, datatype,
 
                 # Plot confusion matrix (if not in probabilistic classification mode)
                 if include_figs:
-                    brnn_plot.confusion_matrix(all_targets, all_outputs, num_classes, 
-                                                output_file_prefix=output_file_prefix)
+                    brnn_plot.confusion_matrix(
+                        all_targets,
+                        all_outputs,
+                        num_classes,
+                        output_file_prefix=output_file_prefix,
+                    )
 
     return test_loss / len(test_loader.dataset), predictions
 
 
-def test_unlabeled_data(network, sequences, device, encoding_scheme='onehot', encoder=None, print_frequency=None):
+def test_unlabeled_data(
+    network,
+    sequences,
+    device,
+    encoding_scheme="onehot",
+    encoder=None,
+    print_frequency=None,
+):
     """Test a trained BRNN on unlabeled sequences
 
     Use a trained network to make predictions on previously-unseen data.
 
-    ** 
+    **
     Note: Unlike the previous functions, `network` here must have pre-loaded
-    weights. 
+    weights.
     **
 
     Parameters
@@ -374,8 +425,9 @@ def test_unlabeled_data(network, sequences, device, encoding_scheme='onehot', en
     sequences : list
             A list of amino acid sequences to test using the network
     device : str
-            Location of where testing will take place--should be either 'cpu' or
-            'cuda' (GPU). If available, training on GPU is typically much faster.
+            Location of where training will take place--should be 'cpu', 'mps' (Apple
+            GPU) or 'cuda' (GPU). If available, training on GPU is typically
+            much faster.
     encoding_scheme : str, optional
             How amino acid sequences are to be encoded as numeric vectors. Currently,
             'onehot','biophysics' and 'user' are the implemented options.
@@ -386,7 +438,7 @@ def test_unlabeled_data(network, sequences, device, encoding_scheme='onehot', en
     print_frequency : int
             If provided defines at what sequence interval an update is printed.
             Default = None.
-    
+
     Returns
     -------
     dict
@@ -403,13 +455,13 @@ def test_unlabeled_data(network, sequences, device, encoding_scheme='onehot', en
         local_count = local_count + 1
         if print_frequency is not None:
             if local_count % print_frequency == 0:
-                print(f'On {local_count} of {total_count}')
+                print(f"On {local_count} of {total_count}")
 
-        if encoding_scheme == 'onehot':
+        if encoding_scheme == "onehot":
             seq_vector = encode_sequence.one_hot(seq)
-        elif encoding_scheme == 'biophysics':
+        elif encoding_scheme == "biophysics":
             seq_vector = encode_sequence.biophysics(seq)
-        elif encoding_scheme == 'user':
+        elif encoding_scheme == "user":
             seq_vector = encoder.encode(seq)
 
         seq_vector = seq_vector.view(1, len(seq_vector), -1)
