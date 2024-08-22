@@ -8,10 +8,8 @@ idptools-parrot was developed by the Holehouse lab
 Question/comments/concerns? Raise an issue on github:
 https://github.com/idptools/parrot
 
-Licensed under the MIT license. 
+Licensed under the MIT license.
 """
-
-import math
 
 import numpy as np
 
@@ -20,18 +18,19 @@ try:
     import GPyOpt
     from GPyOpt.methods import BayesianOptimization
 except ImportError:
-    print('Error importing GPy.')
-    print(' If trying to run parrot-optimize, make sure to use `pip install idptools-parrot[optimize]`')
+    print("Error importing GPy.")
+    print(
+        " If trying to run parrot-optimize, make sure to use `pip install idptools-parrot[optimize]`"
+    )
 
-from parrot import train_network
-from parrot import brnn_architecture
+from parrot import brnn_architecture, train_network
 
 
 class BayesianOptimizer(object):
     """A class for conducting Bayesian Optimization on a PyTorch RNN
 
     Sets up and runs GPy Bayesian Optimization in order to choose the best-
-    performing hyperparameters for a RNN for a given machine learning task. 
+    performing hyperparameters for a RNN for a given machine learning task.
     Iteratively change learning rate, hidden vector size, and the number of layers
     in the network, then train and validating using 5-fold cross validation.
 
@@ -55,7 +54,7 @@ class BayesianOptimizer(object):
     weights_file : str
             Path to which the network weights will be saved during training
     device : str
-            'cpu' or 'cuda' depending on system hardware
+            'cpu', 'mps' or 'cuda' depending on system hardware
     max_iterations : int
             Maximum number of iterations to perform the optimization procedure
     silent : bool
@@ -64,8 +63,18 @@ class BayesianOptimizer(object):
             GPy-compatible bounds for each of the hyperparameters to be optimized
     """
 
-    def __init__(self, cv_dataloaders, input_size, n_epochs, n_classes,
-                 dtype, weights_file, max_iterations, device, silent):
+    def __init__(
+        self,
+        cv_dataloaders,
+        input_size,
+        n_epochs,
+        n_classes,
+        dtype,
+        weights_file,
+        max_iterations,
+        device,
+        silent,
+    ):
         """
         Parameters
         ----------
@@ -83,7 +92,7 @@ class BayesianOptimizer(object):
         weights_file : str
                 Path to which the network weights will be saved during training
         device : str
-                'cpu' or 'cuda' depending on system hardware
+                'cpu', 'mps' or 'cuda' depending on system hardware
         max_iterations : int
                 Maximum number of iterations to perform the optimization procedure
         silent : bool
@@ -96,9 +105,9 @@ class BayesianOptimizer(object):
         self.n_folds = len(cv_dataloaders)
         self.n_classes = n_classes
         if n_classes > 1:
-            self.problem_type = 'classification'
+            self.problem_type = "classification"
         else:
-            self.problem_type = 'regression'
+            self.problem_type = "regression"
 
         self.dtype = dtype
         self.weights_file = weights_file
@@ -106,9 +115,19 @@ class BayesianOptimizer(object):
         self.device = device
         self.silent = silent
 
-        self.bds = [{'name': 'log_learning_rate', 'type': 'continuous', 'domain': (-5, -2)},  # 0.00001-0.01
-                    {'name': 'n_layers', 'type': 'discrete', 'domain': tuple(range(1, 6))},  # 1-5
-                    {'name': 'hidden_size', 'type': 'discrete', 'domain': tuple(range(5, 51))}]  # 5-50
+        self.bds = [
+            {
+                "name": "log_learning_rate",
+                "type": "continuous",
+                "domain": (-5, -2),
+            },  # 0.00001-0.01
+            {
+                "name": "n_layers",
+                "type": "discrete",
+                "domain": tuple(range(1, 6)),
+            },  # 1-5
+            {"name": "hidden_size", "type": "discrete", "domain": tuple(range(5, 51))},
+        ]  # 5-50
 
     def compute_cv_loss(self, hyperparameters):
         """Compute the average cross-val loss for a given set of hyperparameters
@@ -125,7 +144,7 @@ class BayesianOptimizer(object):
         Returns
         -------
         numpy float array
-                a Nx1 numpy array of the average cross-val loss 
+                a Nx1 numpy array of the average cross-val loss
                 per set of input hyperparameters
         """
 
@@ -134,7 +153,7 @@ class BayesianOptimizer(object):
         for i in range(len(hyperparameters)):
 
             log_lr, nl, hs = hyperparameters[i]
-            lr = 10**float(log_lr)
+            lr = 10 ** float(log_lr)
             nl = int(nl)
             hs = int(hs)
 
@@ -143,7 +162,10 @@ class BayesianOptimizer(object):
             avg = np.average(cv_outputs[i])
 
             if self.silent is False:
-                print('  %.6f	|     %2d       |         %2d           |    %.3f' % (lr, nl, hs, avg))
+                print(
+                    "  %.6f	|     %2d       |         %2d           |    %.3f"
+                    % (lr, nl, hs, avg)
+                )
 
         outputs = np.average(cv_outputs, axis=1)
         return outputs
@@ -166,23 +188,36 @@ class BayesianOptimizer(object):
                 the best validation loss from each fold of cross validation
         """
 
-        cv_losses = np.zeros(self.n_folds) - 1  # -1 so that it's obvious if something goes wrong
+        cv_losses = (
+            np.zeros(self.n_folds) - 1
+        )  # -1 so that it's obvious if something goes wrong
 
         for k in range(self.n_folds):
-            if self.dtype == 'sequence':
+            if self.dtype == "sequence":
                 # Use a many-to-one architecture
-                brnn_network = brnn_architecture.BRNN_MtO(self.input_size, hs, nl,
-                                                          self.n_classes, self.device).to(self.device)
+                brnn_network = brnn_architecture.BRNN_MtO(
+                    self.input_size, hs, nl, self.n_classes, self.device
+                ).to(self.device)
             else:
                 # Use a many-to-many architecture
-                brnn_network = brnn_architecture.BRNN_MtM(self.input_size, hs, nl,
-                                                          self.n_classes, self.device).to(self.device)
+                brnn_network = brnn_architecture.BRNN_MtM(
+                    self.input_size, hs, nl, self.n_classes, self.device
+                ).to(self.device)
 
             # Train network with this set of hyperparameters
-            train_losses, val_losses = train_network.train(brnn_network, self.cv_loaders[k][0],
-                                                           self.cv_loaders[k][1], self.dtype, self.problem_type,
-                                                           self.weights_file, stop_condition='iter', device=self.device,
-                                                           learn_rate=lr, n_epochs=self.n_epochs, silent=True)
+            train_losses, val_losses = train_network.train(
+                brnn_network,
+                self.cv_loaders[k][0],
+                self.cv_loaders[k][1],
+                self.dtype,
+                self.problem_type,
+                self.weights_file,
+                stop_condition="iter",
+                device=self.device,
+                learn_rate=lr,
+                n_epochs=self.n_epochs,
+                silent=True,
+            )
             # Take best val loss
             best_val_loss = np.min(val_losses)
             cv_losses[k] = best_val_loss
@@ -211,7 +246,7 @@ class BayesianOptimizer(object):
         for i in range(len(x)):
 
             log_lr, nl, hs = x[i]
-            lr = 10**float(log_lr)
+            lr = 10 ** float(log_lr)
             nl = int(nl)
             hs = int(hs)
 
@@ -237,32 +272,55 @@ class BayesianOptimizer(object):
         """
 
         # Initial hyperparameter search -- used to get noise estimate
-        x_init = np.array([[-3.0, 1, 20], [-3.0, 2, 20], [-3.0, 3, 20], [-3.0, 4, 20], [-3.0, 5, 20],
-                           [-2.0, 2, 20], [-3.3, 2, 20], [-4.0, 2, 20], [-5.0, 2, 20],
-                           [-3.0, 2, 5],  [-3.0, 2, 15], [-3.0, 2, 35], [-3.0, 2, 50]])
+        x_init = np.array(
+            [
+                [-3.0, 1, 20],
+                [-3.0, 2, 20],
+                [-3.0, 3, 20],
+                [-3.0, 4, 20],
+                [-3.0, 5, 20],
+                [-2.0, 2, 20],
+                [-3.3, 2, 20],
+                [-4.0, 2, 20],
+                [-5.0, 2, 20],
+                [-3.0, 2, 5],
+                [-3.0, 2, 15],
+                [-3.0, 2, 35],
+                [-3.0, 2, 50],
+            ]
+        )
         y_init, noise = self.initial_search(x_init)
 
         if self.silent is False:
             print("\nInitial search results:")
             print("lr\tnl\ths\toutput")
             for i in range(len(x_init)):
-                print("%.5f\t%2d\t%2d\t%.4f" % (10**x_init[i][0], x_init[i][1], x_init[i][2], y_init[i][0]))
+                print(
+                    "%.5f\t%2d\t%2d\t%.4f"
+                    % (10 ** x_init[i][0], x_init[i][1], x_init[i][2], y_init[i][0])
+                )
             print("Noise estimate:", noise)
-            print('\n')
-            print('Primary optimization:')
-            print('--------------------\n')
-            print('Learning rate   |   n_layers   |   hidden vector size |  avg CV loss  ')
-            print('======================================================================')
+            print("\n")
+            print("Primary optimization:")
+            print("--------------------\n")
+            print(
+                "Learning rate   |   n_layers   |   hidden vector size |  avg CV loss  "
+            )
+            print(
+                "======================================================================"
+            )
 
-        optimizer = BayesianOptimization(f=self.compute_cv_loss,
-                                         domain=self.bds,
-                                         model_type='GP',
-                                         acquisition_type='EI',
-                                         acquisition_jitter=0.05,
-                                         X=x_init,
-                                         Y=y_init,
-                                         noise_var=noise,
-                                         maximize=False)
+        optimizer = BayesianOptimization(
+            f=self.compute_cv_loss,
+            domain=self.bds,
+            model_type="GP",
+            acquisition_type="EI",
+            acquisition_jitter=0.05,
+            X=x_init,
+            Y=y_init,
+            noise_var=noise,
+            maximize=False,
+        )
 
         optimizer.run_optimization(max_iter=self.max_iterations)
 
@@ -270,8 +328,10 @@ class BayesianOptimizer(object):
         outs = optimizer.get_evaluations()[1].flatten()
 
         if self.silent is False:
-            print("\nThe optimal hyperparameters are:\nlr = %.5f\nnl = %d\nhs = %d" %
-                  (10**optimizer.x_opt[0], optimizer.x_opt[1], optimizer.x_opt[2]))
+            print(
+                "\nThe optimal hyperparameters are:\nlr = %.5f\nnl = %d\nhs = %d"
+                % (10 ** optimizer.x_opt[0], optimizer.x_opt[1], optimizer.x_opt[2])
+            )
             print()
 
         return optimizer.x_opt
