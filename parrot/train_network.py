@@ -10,6 +10,8 @@ https://github.com/idptools/parrot
 
 Licensed under the MIT license.
 """
+import time
+from datetime import timedelta
 
 import numpy as np
 import torch
@@ -98,6 +100,9 @@ def train(
             A list of the average validation set losses achieved at each epoch
     """
 
+    print(f"Using device: {device}")
+    network.to(device)
+
     # Set optimizer
     optimizer = torch.optim.Adam(network.parameters(), lr=learn_rate)
 
@@ -111,7 +116,7 @@ def train(
         criterion = nn.CrossEntropyLoss(reduction="sum")
 
     network = network.float()
-    total_step = len(train_loader)
+    # total_step = len(train_loader)
     min_val_loss = np.inf
     avg_train_losses = []
     avg_val_losses = []
@@ -119,19 +124,28 @@ def train(
     if stop_condition == "auto":
         min_epochs = n_epochs
         # Set to some arbitrarily large number of iterations -- will stop automatically
-        n_epochs = 20000000
+        # n_epochs = 20000000
+        n_epochs = 2 * n_epochs
         last_decrease = 0
 
     # Train the model - evaluate performance on val set every epoch
     end_training = False
+
+    with open("train_network.debug.log", "w") as f:
+        f.write("DataType\tProblemType\tEpoch\tStopCondition\tStartTime\tEndTime\tElapsedTime\tTrainLoss\tValLoss\tSignificantDecrease\tLastDecreaseEpoch\n")
+
+    # To be saved only once
+    best_network_dict = None
+
     for epoch in range(n_epochs):  # Main loop
+        start_time = time.time()
 
         # Initialize training and testing loss for epoch
         train_loss = 0
         val_loss = 0
 
         # Iterate over batches
-        for i, (names, vectors, targets) in enumerate(train_loader):
+        for _names, vectors, targets in train_loader:
             vectors = vectors.to(device)
             targets = targets.to(device)
 
@@ -152,7 +166,7 @@ def train(
             loss.backward()
             optimizer.step()
 
-        for names, vectors, targets in val_loader:
+        for _names, vectors, targets in val_loader:
             vectors = vectors.to(device)
             targets = targets.to(device)
 
@@ -189,21 +203,57 @@ def train(
         if val_loss < min_val_loss:
             min_val_loss = val_loss  # Reset min_val_loss
             last_decrease = epoch
-            torch.save(network.state_dict(), weights_file)  # Save model
+            best_network_dict = network.state_dict()
+            # torch.save(network.state_dict(), weights_file)  # Save model
 
         # Append losses to lists
         avg_train_losses.append(train_loss)
         avg_val_losses.append(val_loss)
 
+        end_time = time.time()
+        elapsed_time = timedelta(seconds=end_time - start_time)
+
+        # Convert elapsed time to hours, minutes, seconds, and milliseconds
+        hours, remainder = divmod(elapsed_time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        milliseconds = elapsed_time.microseconds // 1000  # Convert microseconds to milliseconds
+
+        formatted_start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))
+        formatted_end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time))
+        formatted_elapsed_time = f"{hours}h, {minutes}m, {seconds}s, {milliseconds}ms"
+
+        epoch_detail_line = "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%.4f\t%.4f\t%s\t%d\n" % (
+            datatype,
+            problem_type,
+            epoch + 1,
+            stop_condition,
+            formatted_start_time,
+            formatted_end_time,
+            formatted_elapsed_time,
+            train_loss,
+            val_loss,
+            str(signif_decrease),
+            last_decrease + 1
+        )
+
+        with open("train_network.debug.log", "a") as f:
+            f.write(epoch_detail_line)
+
         if verbose:
-            print("Epoch %d\tLoss %.4f" % (epoch, val_loss))
+            print(epoch_detail_line)
         elif epoch % 5 == 0 and silent is False:
-            print("Epoch %d\tLoss %.4f" % (epoch, val_loss))
+            print(epoch_detail_line)
 
         # This is placed here to ensure that the best network, even if the performance
         # improvement is marginal, is saved.
         if end_training:
             break
+
+    # Save model only once
+    if best_network_dict:
+        torch.save(best_network_dict, weights_file)
+    else:
+        raise "No data to save the model"
 
     # Return loss per epoch so that they can be plotted
     return avg_train_losses, avg_val_losses
@@ -350,9 +400,11 @@ def test_labeled_data(
             # Format predictions and assign class predictions
             for i in range(len(predictions)):
                 pred_values = []
+
                 for j in range(len(predictions[i][2])):
                     pred_values = np.argmax(predictions[i][2], axis=1)[0]
-                predictions[i][2] = np.array(pred_values, dtype=np.int)
+
+                predictions[i][2] = np.array(pred_values, dtype=int)
 
         elif datatype == "sequence":
             if probabilistic_classification:
