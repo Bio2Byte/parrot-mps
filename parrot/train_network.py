@@ -132,7 +132,7 @@ def train(
     end_training = False
 
     with open("train_network.debug.log", "w") as f:
-        f.write("DataType\tProblemType\tEpoch\tStopCondition\tStartTime\tEndTime\tElapsedTime\tTrainLoss\tValLoss\tSignificantDecrease\tLastDecreaseEpoch\n")
+        f.write("DataType;ProblemType;Epoch;MaxEpochs;Percentage;StopCondition;StartTime;EndTime;ElapsedTime;TrainLoss;ValLoss;SignificantDecrease;LastDecreaseEpoch\n")
 
     # To be saved only once
     best_network_dict = None
@@ -221,20 +221,9 @@ def train(
         formatted_start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))
         formatted_end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time))
         formatted_elapsed_time = f"{hours}h, {minutes}m, {seconds}s, {milliseconds}ms"
+        percentage = 100*((epoch+1)/n_epochs)
 
-        epoch_detail_line = "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%.4f\t%.4f\t%s\t%d\n" % (
-            datatype,
-            problem_type,
-            epoch + 1,
-            stop_condition,
-            formatted_start_time,
-            formatted_end_time,
-            formatted_elapsed_time,
-            train_loss,
-            val_loss,
-            str(signif_decrease),
-            last_decrease + 1
-        )
+        epoch_detail_line = f"{datatype};{problem_type};{epoch + 1};{n_epochs};{percentage:.4f}%;{stop_condition};{formatted_start_time};{formatted_end_time};{formatted_elapsed_time};{train_loss:.4f};{val_loss:.4f};{str(signif_decrease)};{last_decrease + 1}\n"
 
         with open("train_network.debug.log", "a") as f:
             f.write(epoch_detail_line)
