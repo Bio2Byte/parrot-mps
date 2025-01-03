@@ -15,21 +15,14 @@ https://github.com/idptools/parrot
 Licensed under the MIT license.
 """
 
+import argparse
 import os
-import sys
 
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import argparse
 
+from parrot import brnn_architecture, brnn_plot, train_network
 from parrot import process_input_data as pid
-from parrot import brnn_architecture
-from parrot import train_network
-from parrot import brnn_plot
-from parrot.tools import validate_args
-from parrot.tools import dataset_warnings
+from parrot.tools import dataset_warnings, validate_args
 
 # Parse the command line arguments
 parser = argparse.ArgumentParser(

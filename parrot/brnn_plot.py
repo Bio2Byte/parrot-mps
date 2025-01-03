@@ -18,8 +18,8 @@ import traceback
 
 import matplotlib as mpl
 
-mpl.use('Agg')
-
+mpl.use("Agg")
+import mpl.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sn
@@ -39,8 +39,6 @@ from parrot import encode_sequence
 # Set global font size and line width for better publication clarity
 mpl.rcParams["font.size"] = 12
 mpl.rcParams["lines.linewidth"] = 2
-
-import matplotlib.pyplot as plt
 
 
 def training_loss(train_loss, val_loss, output_file_prefix=""):
@@ -112,6 +110,7 @@ def training_loss(train_loss, val_loss, output_file_prefix=""):
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def sequence_regression_scatterplot(true, predicted, output_file_prefix=""):
@@ -178,6 +177,7 @@ def sequence_regression_scatterplot(true, predicted, output_file_prefix=""):
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def residue_regression_scatterplot(true, predicted, output_file_prefix=""):
@@ -255,6 +255,7 @@ def residue_regression_scatterplot(true, predicted, output_file_prefix=""):
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def plot_roc_curve(
@@ -366,6 +367,7 @@ def plot_roc_curve(
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def plot_precision_recall_curve(
@@ -412,7 +414,7 @@ def plot_precision_recall_curve(
     )
 
     # Plot
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 8))
+    _fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8, 8))
     ax.plot(
         recall["micro"],
         precision["micro"],
@@ -468,6 +470,7 @@ def plot_precision_recall_curve(
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def confusion_matrix(
@@ -525,6 +528,7 @@ def confusion_matrix(
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def res_confusion_matrix(
@@ -595,6 +599,7 @@ def res_confusion_matrix(
         pad_inches=0.1,
     )
     plt.clf()
+    plt.close()
 
 
 def write_performance_metrics(
